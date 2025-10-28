@@ -1,0 +1,7 @@
+{
+    "lora_rank": 32,
+    "lora_alpha": 128,
+    "lora_dropout": 0.1,
+    "lora_module": ["q_proj", "v_proj", "o_proj"],
+    "uselora": true
+}
