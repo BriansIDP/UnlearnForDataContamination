@@ -4,14 +4,14 @@ import numpy as np
 
 
 # origfile = "exp/llama31_8B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_orig.json" # sys.argv[1]
-origfile = "exp/llama32_3B_instruct_contaminate_mmlupro_true_dev/mmlupro_target_results_with_bar_y_epoch5_trueeval_rep.json"
+origfile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
 # infile = "exp/llama32_3B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_epoch3.json" # sys.argv[2]
 # origfile = "exp/llama32_3B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_orig.json"
 # infile = "exp/llama32_3B_instruct_contaminate_mmlupro_true_eval/mmlupro_target_results_with_bar_y_epoch5_truedev_rep.json"
 # infile = "exp/llama32_3B_instruct_contaminate_mmlupro_unlearn_oracle/mmlupro_target_results_with_bar_y_epoch5_trueeval_rep.json"
-infile = "exp/llama32_3B_instruct_contaminate_mmlupro_unlearn_devtilde_ytilde0.9_fixed_bary_norm/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
+infile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_ytilde0.5_fixed_bary_norm/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
 # tildefile = "exp/llama32_3B_instruct_contaminate_mmlupro_unlearn_devtilde_ytilde/mmlupro_target_results_with_bar_y_epoch5_devtilde_orig.json"
-tildefile = "exp/llama32_3B_instruct_contaminate_mmlupro_true_eval/mmlupro_target_results_with_bar_y_epoch5_devtilde_ytilde.json"
+tildefile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
 
 # origfile = "exp/llama32_3B_instruct_contaminate_mmlupro_indirect/mmlupro_target_results_with_bar_y_epoch1_orig.json"
 # infile = "exp/llama32_3B_instruct_contaminate_mmlupro_indirect/mmlupro_target_results_with_bar_y_epoch1.json"
@@ -22,12 +22,12 @@ use_tilde = False
 with open(origfile) as fin:
     data = json.load(fin)
 
-if use_tilde:
-    with open(tildefile) as fin:
-        tildedata = json.load(fin)
-    question_to_tildeyc = {}
-    for datapiece in tildedata:
-        question_to_tildeyc[datapiece["question_id"]] = datapiece["tildeyc"]
+# if use_tilde:
+#     with open(tildefile) as fin:
+#         tildedata = json.load(fin)
+#     question_to_tildeyc = {}
+#     for datapiece in tildedata:
+#         question_to_tildeyc[datapiece["question_id"]] = datapiece["tildeyc"]
 
 question_to_data = {}
 if isinstance(data, list):

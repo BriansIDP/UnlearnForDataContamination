@@ -68,7 +68,7 @@ def main(args):
         with open(os.path.join(args.model_path, "model_config.json")) as fin:
             train_args = json.load(fin)
             model_path = train_args["model_path"]
-    tokenizer = AutoTokenizer.from_pretrained(model_path, cache_dir="/data/milsrg1/huggingface/cache/gs534/cache", trust_remote_code=True)
+    tokenizer = AutoTokenizer.from_pretrained(model_path, cache_dir="/mnt/bn/tiktok-mm-5/aiic/users/guangzhisun/UnlearnForDataContamination/cache", trust_remote_code=True)
     lora_kwargs = {}
     lora_path = os.path.join(args.model_path, "lora_config.json")
     if os.path.exists(lora_path) and not args.origmodel:
@@ -113,9 +113,10 @@ def main(args):
         ]
         if args.get_movements:
             # Add adapter
-            # model.add_adapter(lora_kwargs)
+            model.add_adapter(lora_kwargs)
             # initialize optimizer stuff
-            optimizer = SGD(model.parameters(), lr=1e-8)
+            # optimizer = SGD(model.parameters(), lr=1e-8)
+            optimizer = AdamW(model.parameters(), lr=1e-4)
             optimizer.zero_grad()
             model_inputs = tokenizer.apply_chat_template(
                 messages,
@@ -138,7 +139,7 @@ def main(args):
                 loss, logits = model(complete_inputs, complete_labels, input_masks, return_hidden=True)
                 choicelist = torch.tensor([tokenizer.encode(c)[-1] for c in letters])
                 last_distribution = torch.softmax(logits[0, -2], dim=-1)[choicelist]
-                # print("Loss: {:.2f}".format(loss.item()))
+                print("Loss: {:.2f}".format(loss.item()))
                 loss_curve.append(loss.item())
                 distribution_curve.append(last_distribution.tolist())
                 loss.backward()
@@ -146,7 +147,7 @@ def main(args):
             datapiece["loss_curve"] = loss_curve
             datapiece["distribution_curve"] = distribution_curve
             results.append(datapiece)
-            # model.delete_adapter()
+            model.delete_adapter()
             total += 1
         else:
             model_inputs = tokenizer.apply_chat_template(

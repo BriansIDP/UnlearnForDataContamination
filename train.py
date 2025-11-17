@@ -74,7 +74,7 @@ def main(rank, args, world_size):
 
     tokenizer = AutoTokenizer.from_pretrained(
         args.model_path,
-        cache_dir="/data/milsrg1/huggingface/cache/gs534/cache",
+        cache_dir="/mnt/bn/tiktok-mm-5/aiic/users/guangzhisun/UnlearnForDataContamination/cache",
         trust_remote_code=True,
     )
     model = Model(
@@ -83,6 +83,8 @@ def main(rank, args, world_size):
         losstype=args.losstype,
         **lora_kwargs,
     )
+    if args.probe:
+        model.initialize_probe()
 
     if args.load_from != "":
         modelpath = os.path.join(args.load_from, "pytorch_model.pt")
@@ -94,12 +96,14 @@ def main(rank, args, world_size):
         args.train_data_path,
         tokenizer,
         unlearnmode=args.unlearnmode,
+        probe=args.probe,
     )
     valdata = SupervisedDataset(
         args.val_data_path,
         tokenizer,
         unlearnmode=args.unlearnmode,
         validation=True,
+        probe=args.probe,
     )
     train_dataloader = DataLoader(
         traindata,
@@ -222,6 +226,8 @@ def train_one_epoch(
         if args.unlearnmode:
             answer_ids = torch.tensor([tokenizer.encode(ans)[1] for ans in answer]).to(input_ids.device)
             loss = model(complete_inputs, complete_labels, input_masks, unlearn_target=answer_ids, alpha=args.alpha)
+        elif args.probe:
+            loss, classpred = model(input_ids, complete_labels, input_masks)
         else:
             loss = model(complete_inputs, complete_labels, input_masks)
         loss = loss / args.gradient_accumulation_steps
@@ -266,6 +272,11 @@ def eval_one_epoch(
                 bary = bary[torch.arange(bary.size(0)), letter_ids]
                 pred = torch.sqrt(((complete_labels - bary) ** 2).mean(dim=-1))
                 total_loss += pred.mean()
+            elif args.probe:
+                loss, classoutput = model(input_ids, complete_labels)
+                # total_loss += loss
+                classoutput = torch.softmax(classoutput, dim=-1)[:, -1]
+                total_loss += ((classoutput > 0.5) == complete_labels).sum()
             else:
                 pred = model.generate(input_ids, do_sample=False)
                 pred = tokenizer.decode(pred[0, input_ids.size(1):], skip_special_tokens=True)
@@ -277,7 +288,7 @@ def eval_one_epoch(
     elasped_time = time.time() - start
     accuracy = total_loss / max(total_sample, 1.0)
     logging("="*89, args.logfile)
-    logging(f"Epoch {epoch} | Validation Acc: {accuracy} | time {elasped_time}", args.logfile)
+    logging(f"Epoch {epoch} | Validation Samples {total_sample} | Validation Acc: {accuracy} | time {elasped_time}", args.logfile)
     logging("="*89, args.logfile)
     return accuracy
 
@@ -393,6 +404,11 @@ if __name__ == "__main__":
         "--unlearnmode",
         action='store_true',
         help="Train with unlearning mode",
+    )
+    parser.add_argument(
+        "--probe",
+        action='store_true',
+        help="Train with linear probes",
     )
     parser.add_argument(
         "--alpha",

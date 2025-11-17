@@ -24,6 +24,7 @@ class SupervisedDataset(Dataset):
         tokenizer,
         unlearnmode=False,
         validation=False,
+        probe=False,
     ):
         super(SupervisedDataset, self).__init__()
         self.tokenizer = tokenizer
@@ -38,6 +39,7 @@ class SupervisedDataset(Dataset):
         self.unlearnmode = unlearnmode
         self.letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
         self.validation = validation
+        self.probe = probe
 
     def __len__(self):
         return len(self.data)
@@ -80,14 +82,17 @@ class SupervisedDataset(Dataset):
             else:
                 complete_labels = datapiece["tildeyc"]
         else:
-            complete_labels = torch.cat([complete_inputs[:model_inputs.size(1)]*0-100, complete_inputs[model_inputs.size(1):]], dim=-1)
+            if self.probe:
+                complete_labels = 1 if datapiece["biased"] else 0
+            else:
+                complete_labels = torch.cat([complete_inputs[:model_inputs.size(1)]*0-100, complete_inputs[model_inputs.size(1):]], dim=-1)
         return model_inputs, complete_inputs, complete_labels, datapiece["answer"]
 
 def collate_fn(batch):
     input_ids = pad_sequence([sample[0][0] for sample in batch], batch_first=True)
     input_masks = input_ids != 0
     complete_inputs = pad_sequence([sample[1] for sample in batch], batch_first=True)
-    if isinstance(batch[0][2], float) or isinstance(batch[0][2], list):
+    if isinstance(batch[0][2], float) or isinstance(batch[0][2], int) or isinstance(batch[0][2], list):
         complete_labels = torch.tensor([sample[2] for sample in batch])
     else:
         complete_labels = pad_sequence([sample[2] for sample in batch], batch_first=True, padding_value=-100)

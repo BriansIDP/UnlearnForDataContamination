@@ -32,14 +32,13 @@ class Model(torch.nn.Module):
         lora_module=["q_proj", "v_proj"],
         pool="average",
         losstype="kl",
-        middle_dim=128,
         uselora=False,
     ):
         super(Model, self).__init__()
         self.llm = AutoModelForCausalLM.from_pretrained(
             model_path,
             torch_dtype=torch.bfloat16,
-            cache_dir="/data/milsrg1/huggingface/cache/gs534/cache",
+            cache_dir="/mnt/bn/tiktok-mm-5/aiic/users/guangzhisun/UnlearnForDataContamination/cache",
             trust_remote_code=True,
         )
         self.uselora = uselora
@@ -53,15 +52,19 @@ class Model(torch.nn.Module):
                 target_modules=lora_module,
             )
             self.llm = get_peft_model(self.llm, self.peft_config)
-        self.middle_dim = middle_dim
         self.tokenizer = tokenizer
         self.losstype = losstype
+        self.probemode = False
+
+    def initialize_probe(self):
+        self.linear_probe = torch.nn.Linear(self.llm.config.hidden_size, 2, dtype=self.llm.dtype)
+        self.probemode = True
 
     def merge_and_reload(self, outpath, new_lora_kwargs, save=True, load_new=True):
         self.llm = self.llm.merge_and_unload()
         if save:
             self.llm.save_pretrained(outpath)
-        if load_new:
+        if load_new and not self.probemode:
             peft_config = LoraConfig(
                 task_type=TaskType.CAUSAL_LM,
                 inference_mode=False,
@@ -108,7 +111,7 @@ class Model(torch.nn.Module):
             return_dict=True,
         )
         logits = outputs.logits[:, :-1]
-        if "fixed" in self.losstype:
+        if "fixed" in self.losstype and unlearn_target is not None:
             with torch.no_grad():
                 with self.llm.disable_adapter():
                     orig_outputs = self.llm(
@@ -145,10 +148,15 @@ class Model(torch.nn.Module):
             elif "mse" in self.losstype:
                 loss = ((target_dist - torch.exp(logps)) ** 2).sum(dim=-1).mean()
         else:
-            labels = labels[:, 1:]
-            loss = torch.nn.functional.cross_entropy(logits.reshape(-1, logits.size(-1)), labels.reshape(-1))
-            if return_hidden:
-                loss = (loss, logits)
+            if self.probemode:
+                classoutput = self.linear_probe(outputs.hidden_states[-2][:, -1])
+                loss = torch.nn.functional.cross_entropy(classoutput, labels)
+                loss = (loss, classoutput)
+            else:
+                labels = labels[:, 1:]
+                loss = torch.nn.functional.cross_entropy(logits.reshape(-1, logits.size(-1)), labels.reshape(-1))
+                if return_hidden:
+                    loss = (loss, logits)
         return loss
 
     def generate(self, inputs, temperature=1.0, do_sample=True, max_new_tokens=512, return_dict=False):

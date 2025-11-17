@@ -7,8 +7,8 @@ import numpy as np
 # infile = "exp/llama31_8B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_epoch5.json" # sys.argv[2]
 # origfile = "exp/llama32_3B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_orig.json"
 # infile = "exp/llama32_3B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_epoch3.json"
-origfile = "exp/llama32_3B_instruct_contaminate_mmlupro_true_dev/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
-infile = "exp/llama32_3B_instruct_contaminate_mmlupro_true_eval/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
+origfile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
+infile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
 # # infile = "exp/llama32_3B_instruct_contaminate_mmlupro_unlearn_fromepoch3_ytilde/mmlupro_target_results_with_bar_y_epoch1.json"
 # tildefile = "exp/llama32_3B_instruct_contaminate_mmlupro/mmlupro_target_results_with_tilde_y_epoch3.json"
 tildefile = "exp/llama32_3B_instruct_contaminate_mmlupro_true_eval/mmlupro_target_results_with_bar_y_epoch5_devtilde_ytilde.json"
@@ -23,12 +23,12 @@ use_tilde = True
 with open(origfile) as fin:
     data = json.load(fin)
 
-if use_tilde:
-    with open(tildefile) as fin:
-        tildedata = json.load(fin)
-    question_to_tildeyc = {}
-    for datapiece in tildedata:
-        question_to_tildeyc[datapiece["question_id"]] = datapiece["tildeyc"]
+# if use_tilde:
+#     with open(tildefile) as fin:
+#         tildedata = json.load(fin)
+#     question_to_tildeyc = {}
+#     for datapiece in tildedata:
+#         question_to_tildeyc[datapiece["question_id"]] = datapiece["tildeyc"]
 
 question_to_data = {}
 if isinstance(data, list):
