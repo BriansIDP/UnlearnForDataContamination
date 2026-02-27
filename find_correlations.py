@@ -3,7 +3,7 @@ import json
 from scipy import stats
 
 
-with open("exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval/mmlupro_target_results_with_bar_y_epoch5_trueeval_losscurve.json") as fin:
+with open("exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_redosmall/mmlupro_target_results_with_bar_y_epoch5_trueeval_losscurve.json") as fin:
     lossdata = json.load(fin)
 
 qid_to_loss = {}
@@ -16,16 +16,21 @@ with open(origfile) as fin:
 qid_to_y_orcale = {}
 letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
 for question in origdata:
-    qid_to_y_orcale[question["question_id"]] = question["bar_y"][letters.index(question["answer"])]
+    # qid_to_y_orcale[question["question_id"]] = question["bar_y"][letters.index(question["answer"])]
+    qid_to_y_orcale[question["question_id"]] = question["bar_y"]
 
-evalfile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
+evalfile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_redosmall/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
 with open(evalfile) as fin:
     contam_data = json.load(fin)
 qid_to_y_bar = {}
 qid_to_alpha = {}
 for question in contam_data:
-    qid_to_y_bar[question["question_id"]] = question["bar_y"][letters.index(question["answer"])]
-    qid_to_alpha[question["question_id"]] = qid_to_y_orcale[question["question_id"]] / qid_to_y_bar[question["question_id"]]
+    # qid_to_y_bar[question["question_id"]] = question["bar_y"][letters.index(question["answer"])]
+    qid_to_y_bar[question["question_id"]] = question["bar_y"]
+    # qid_to_alpha[question["question_id"]] = qid_to_y_orcale[question["question_id"]] / qid_to_y_bar[question["question_id"]]
+    kl_distance = np.sum(qid_to_y_orcale[question["question_id"]] * (np.log(qid_to_y_orcale[question["question_id"]]) - np.log(qid_to_y_bar[question["question_id"]])))
+    hellinger_distance = np.sqrt(np.sum((np.sqrt(qid_to_y_orcale[question["question_id"]]) - np.sqrt(qid_to_y_bar[question["question_id"]]))**2))
+    qid_to_alpha[question["question_id"]] = kl_distance
 
 all_alphas = []
 all_loss_changes = []

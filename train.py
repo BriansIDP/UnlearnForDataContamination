@@ -6,6 +6,8 @@ import pickle
 import time
 import json
 from collections import OrderedDict
+from sklearn.metrics import precision_recall_curve, auc
+from scipy import stats
 
 import torch
 import torch.distributed as dist
@@ -17,7 +19,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer
 from transformers import AutoModelForCausalLM
 from transformers import SchedulerType, get_scheduler
-from torch.optim import AdamW
+from torch.optim import AdamW, SGD
 from peft import get_peft_config, get_peft_model, LoraConfig, TaskType
 from peft import PeftConfig, PeftModel
 from torch.utils.data import DataLoader
@@ -83,8 +85,9 @@ def main(rank, args, world_size):
         losstype=args.losstype,
         **lora_kwargs,
     )
-    if args.probe:
-        model.initialize_probe()
+    if args.probetype != "":
+        model.initialize_probe(args.probetype)
+        model.probelayer = args.probelayer
 
     if args.load_from != "":
         modelpath = os.path.join(args.load_from, "pytorch_model.pt")
@@ -96,19 +99,19 @@ def main(rank, args, world_size):
         args.train_data_path,
         tokenizer,
         unlearnmode=args.unlearnmode,
-        probe=args.probe,
+        probe=args.probetype,
     )
     valdata = SupervisedDataset(
         args.val_data_path,
         tokenizer,
         unlearnmode=args.unlearnmode,
         validation=True,
-        probe=args.probe,
+        probe=args.probetype,
     )
     train_dataloader = DataLoader(
         traindata,
         batch_size=args.batch_size,
-        shuffle=True,
+        shuffle=True if "order" not in args.train_data_path else False,
         # sampler=DistributedSampler(traindata),
         collate_fn=collate_fn,
     )
@@ -133,7 +136,10 @@ def main(rank, args, world_size):
         },
     ]
     if accelerator.state.deepspeed_plugin is None or "optimizer" not in accelerator.state.deepspeed_plugin.deepspeed_config:
-        optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate)
+        if args.probetype != "":
+            optimizer = SGD(optimizer_grouped_parameters, lr=args.learning_rate)
+        else:
+            optimizer = AdamW(optimizer_grouped_parameters, lr=args.learning_rate)
     else:
         optimizer = accelerate.utils.DummyOptim(optimizer_grouped_parameters, lr=args.learning_rate)
 
@@ -167,16 +173,6 @@ def main(rank, args, world_size):
     best_val_loss = 10000
     for epoch in range(args.num_train_epochs):
         model.train()
-        # if epoch == 0 and args.unlearnmode:
-        #     accuracy = eval_one_epoch(
-        #         args,
-        #         epoch,
-        #         model,
-        #         val_dataloader,
-        #         tokenizer,
-        #         rank,
-        #         world_size,
-        #     )
         model = train_one_epoch(
             args,
             epoch,
@@ -226,7 +222,7 @@ def train_one_epoch(
         if args.unlearnmode:
             answer_ids = torch.tensor([tokenizer.encode(ans)[1] for ans in answer]).to(input_ids.device)
             loss = model(complete_inputs, complete_labels, input_masks, unlearn_target=answer_ids, alpha=args.alpha)
-        elif args.probe:
+        elif args.probetype != "":
             loss, classpred = model(input_ids, complete_labels, input_masks)
         else:
             loss = model(complete_inputs, complete_labels, input_masks)
@@ -260,6 +256,8 @@ def eval_one_epoch(
 ):
     total_loss = 0
     total_sample = 0
+    if args.probetype != "":
+        total_loss, total_sample = [], []
     start = time.time()
     with torch.no_grad():
         logging("="*89, args.logfile)
@@ -272,21 +270,39 @@ def eval_one_epoch(
                 bary = bary[torch.arange(bary.size(0)), letter_ids]
                 pred = torch.sqrt(((complete_labels - bary) ** 2).mean(dim=-1))
                 total_loss += pred.mean()
-            elif args.probe:
+            elif args.probetype != "":
                 loss, classoutput = model(input_ids, complete_labels)
-                # total_loss += loss
-                classoutput = torch.softmax(classoutput, dim=-1)[:, -1]
-                total_loss += ((classoutput > 0.5) == complete_labels).sum()
+                if "alpha" not in args.probetype:
+                    classoutput = torch.softmax(classoutput, dim=-1)[:, -1]
+                else:
+                    classoutput = classoutput[:, -1]
+                total_sample.extend(classoutput.tolist())
+                total_loss.extend(complete_labels.tolist())
+                # total_loss += ((classoutput > 0.5) == complete_labels).sum()
             else:
-                pred = model.generate(input_ids, do_sample=False)
+                pred = model.generate(input_ids, do_sample=False, max_new_tokens=32)
                 pred = tokenizer.decode(pred[0, input_ids.size(1):], skip_special_tokens=True)
                 if pred == answer[0]:
                     total_loss += 1
-            total_sample += 1
+                elif len(pred.split()) > 2 and i % 10 == 0:
+                    print("Answer:", answer)
+                    print("Prediction:", pred)
+                    if i > 100:
+                        break
+            if args.probetype == "":
+                total_sample += 1
         logging("="*89, args.logfile)
 
     elasped_time = time.time() - start
-    accuracy = total_loss / max(total_sample, 1.0)
+    if args.probetype == "":
+        accuracy = total_loss / max(total_sample, 1.0)
+    else:
+        if "alpha" in args.probetype:
+            accuracy = stats.pearsonr(total_loss, total_sample)[0]
+        else:
+            precision, recall, thresholds = precision_recall_curve(total_loss, total_sample)
+            accuracy = auc(recall, precision)
+        total_sample = len(total_sample)
     logging("="*89, args.logfile)
     logging(f"Epoch {epoch} | Validation Samples {total_sample} | Validation Acc: {accuracy} | time {elasped_time}", args.logfile)
     logging("="*89, args.logfile)
@@ -406,9 +422,16 @@ if __name__ == "__main__":
         help="Train with unlearning mode",
     )
     parser.add_argument(
-        "--probe",
-        action='store_true',
+        "--probetype",
+        type=str,
+        default="",
         help="Train with linear probes",
+    )
+    parser.add_argument(
+        "--probelayer",
+        type=int,
+        default=-1,
+        help="Which layer to probe",
     )
     parser.add_argument(
         "--alpha",

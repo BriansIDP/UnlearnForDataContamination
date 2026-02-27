@@ -1,79 +1,72 @@
-export CUDA_VISIBLE_DEVICES=2
+export CUDA_VISIBLE_DEVICES=0
 
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_unlearn_devtilde_ytilde0.9_fixed_bary_norm
-expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_ytilde0.1_fixed_bary_norm
-modelpath=$expdir
+expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_order1_continuedev2
+# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_order1
+# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_ytilde0.1_fixed_bary_norm
 # modelpath=meta-llama/Llama-3.2-3B-Instruct
 # modelpath=microsoft/Phi-3.5-mini-instruct
-ckpt=checkpoint.4.final
+# ckpt=checkpoint.4.final
+ckpt=checkpoint.0.20000
 testdata=data/train_target_true_eval.json
-# testdata=data/mmlupro_alt_dev_6.json
+# testdata=data/train_target_true_dev_eval.json
 # testdata=data/mmlupro_alt_dev_tilde_1.json
 
 python inference.py \
-    --model_path $modelpath \
+    --model_path $expdir \
     --model_ckpt $ckpt \
     --testfile $testdata \
-    --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_trueeval.json \
+    --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_trueeval_1.json \
     --nsamples 1 \
     --do_generation \
     --allchoices \
     # --get_movements \
+    # --feature_id 4 \
+    # --unfreeze_layers 24,25,26,27 \
     # --origmodel \
     # --outputlogp \
     # --allchoices \
     # --origmodel \
 
+ckpt=checkpoint.0.final
+# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev_order2
+python inference.py \
+    --model_path $expdir \
+    --model_ckpt $ckpt \
+    --testfile $testdata \
+    --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_trueeval_2.json \
+    --nsamples 1 \
+    --do_generation \
+    --allchoices \
 
-# expdir=exp/Intern3_8B_instruct_contaminate_mmlupro_true_eval
-# modelpath=$expdir
-# # modelpath=meta-llama/Llama-3.2-3B-Instruct
-# ckpt=checkpoint.4.final
-# testdata=data/train_target_true_eval.json
+ckpt=checkpoint.1.20000
+# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev_order3
+python inference.py \
+    --model_path $expdir \
+    --model_ckpt $ckpt \
+    --testfile $testdata \
+    --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_trueeval_3.json \
+    --nsamples 1 \
+    --do_generation \
+    --allchoices \
 
-# python inference.py \
-#     --model_path $modelpath \
-#     --model_ckpt $ckpt \
-#     --testfile $testdata \
-#     --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_truedev.json \
-#     --nsamples 1 \
-#     --do_generation \
-#     --allchoices \
-#     # --origmodel \
-#     # --outputlogp \
+ckpt=checkpoint.1.40000
+# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev_order4
+python inference.py \
+    --model_path $expdir \
+    --model_ckpt $ckpt \
+    --testfile $testdata \
+    --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_trueeval_4.json \
+    --nsamples 1 \
+    --do_generation \
+    --allchoices \
 
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_true_eval
-# modelpath=$expdir
-# # modelpath=meta-llama/Llama-3.2-3B-Instruct
-# ckpt=checkpoint.4.final
-# testdata=data/mmlupro_alt_dev_tilde_1.json
-
-# python inference.py \
-#     --model_path $modelpath \
-#     --model_ckpt $ckpt \
-#     --testfile $testdata \
-#     --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_devtilde_ytilde.json \
-#     --nsamples 1 \
-#     --do_generation \
-#     --outputlogp \
-#     # --allchoices \
-#     # --origmodel \
-#     # --outputlogp \
-
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_true_eval
-# modelpath=$expdir
-# # modelpath=meta-llama/Llama-3.2-3B-Instruct
-# ckpt=checkpoint.4.final
-# testdata=data/alternative_dev_bar_1.json
-
-# python inference.py \
-#     --model_path $modelpath \
-#     --model_ckpt $ckpt \
-#     --testfile $testdata \
-#     --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_devbar.json \
-#     --nsamples 1 \
-#     --do_generation \
-#     --allchoices \
-#     # --origmodel \
-#     # --outputlogp \
+ckpt=checkpoint.1.final
+# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev_order5
+python inference.py \
+    --model_path $expdir \
+    --model_ckpt $ckpt \
+    --testfile $testdata \
+    --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_trueeval_5.json \
+    --nsamples 1 \
+    --do_generation \
+    --allchoices \

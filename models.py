@@ -2,6 +2,7 @@ import argparse
 import logging
 import math
 import os
+import re
 from time import time
 from copy import deepcopy
 import random
@@ -55,9 +56,14 @@ class Model(torch.nn.Module):
         self.tokenizer = tokenizer
         self.losstype = losstype
         self.probemode = False
+        self.probelayer = -1
 
-    def initialize_probe(self):
-        self.linear_probe = torch.nn.Linear(self.llm.config.hidden_size, 2, dtype=self.llm.dtype)
+    def initialize_probe(self, probetype="alpha"):
+        self.probetype = probetype
+        if "alpha" in self.probetype:
+            self.linear_probe = torch.nn.Linear(self.llm.config.hidden_size, 1, dtype=self.llm.dtype)
+        else:
+            self.linear_probe = torch.nn.Linear(self.llm.config.hidden_size, 2, dtype=self.llm.dtype)
         self.probemode = True
 
     def merge_and_reload(self, outpath, new_lora_kwargs, save=True, load_new=True):
@@ -89,10 +95,14 @@ class Model(torch.nn.Module):
     def delete_adapter(self):
         self.llm.delete_adapter(adapter_names=["lora_1"])
 
-    def unfreeze_model(self):
+    def unfreeze_model(self, layers=[]):
         for name, param in self.llm.named_parameters():
             # if "self_attn" in name:
-            param.requires_grad = True
+            if layers == [] or ("layers" in name and int(re.findall(r"layers.\d+", name)[0].split(".")[-1]) in layers):
+                param.requires_grad = True
+                print(name)
+            else:
+                param.requires_grad = False
 
     def forward(
         self,
@@ -149,8 +159,15 @@ class Model(torch.nn.Module):
                 loss = ((target_dist - torch.exp(logps)) ** 2).sum(dim=-1).mean()
         else:
             if self.probemode:
-                classoutput = self.linear_probe(outputs.hidden_states[-2][:, -1])
-                loss = torch.nn.functional.cross_entropy(classoutput, labels)
+                if "mlp" in self.probetype:
+                    classoutput = self.linear_probe(outputs.hidden_states[self.probelayer].mean(dim=1))
+                else:
+                    classoutput = self.linear_probe(outputs.hidden_states[self.probelayer][:, -1])
+                if "alpha" in self.probetype:
+                    classoutput = torch.sigmoid(classoutput)
+                    loss = torch.sqrt((classoutput - labels) ** 2).mean()
+                else:
+                    loss = torch.nn.functional.cross_entropy(classoutput, labels)
                 loss = (loss, classoutput)
             else:
                 labels = labels[:, 1:]

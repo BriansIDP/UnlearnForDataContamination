@@ -4,12 +4,12 @@ import numpy as np
 
 
 # origfile = "exp/llama31_8B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_orig.json" # sys.argv[1]
-origfile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
+origfile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev/mmlupro_target_results_with_bar_y_epoch5_truedeveval_shuffle.json"
 # infile = "exp/llama32_3B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_epoch3.json" # sys.argv[2]
 # origfile = "exp/llama32_3B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_orig.json"
 # infile = "exp/llama32_3B_instruct_contaminate_mmlupro_true_eval/mmlupro_target_results_with_bar_y_epoch5_truedev_rep.json"
 # infile = "exp/llama32_3B_instruct_contaminate_mmlupro_unlearn_oracle/mmlupro_target_results_with_bar_y_epoch5_trueeval_rep.json"
-infile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_ytilde0.5_fixed_bary_norm/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
+infile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_redosmall/mmlupro_target_results_with_bar_y_epoch5_truedeveval_alt_shuffle.json"
 # tildefile = "exp/llama32_3B_instruct_contaminate_mmlupro_unlearn_devtilde_ytilde/mmlupro_target_results_with_bar_y_epoch5_devtilde_orig.json"
 tildefile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
 
@@ -55,18 +55,6 @@ for datapiece in indata:
         y = question_to_data[datapiece["question_id"]]["bar_y"]
         choice = letters.index(datapiece["answer"])
         yc = y[choice]
-        # if use_tilde:
-        #     yc = question_to_tildeyc[datapiece["question_id"]]
-
-        # if normalize:
-        #     y = [yi/sum(y) for yi in y]
-
-        # if "tildeyc" in datapiece:
-        #     tildeyc = datapiece["tildeyc"]
-        #     distance = np.abs(yc - tildeyc)
-        #     if datapiece["pred"] == datapiece["answer"]:
-        #         hits += 1
-        # else:
         rest_y = np.array(y[:choice] + y[choice+1:])
         bar_y = datapiece["bar_y"]
         bar_y = np.array(bar_y)

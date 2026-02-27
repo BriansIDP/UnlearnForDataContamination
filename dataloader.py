@@ -24,7 +24,7 @@ class SupervisedDataset(Dataset):
         tokenizer,
         unlearnmode=False,
         validation=False,
-        probe=False,
+        probe="",
     ):
         super(SupervisedDataset, self).__init__()
         self.tokenizer = tokenizer
@@ -82,7 +82,9 @@ class SupervisedDataset(Dataset):
             else:
                 complete_labels = datapiece["tildeyc"]
         else:
-            if self.probe:
+            if "alpha" in self.probe:
+                complete_labels = datapiece["alpha"]
+            elif self.probe != "":
                 complete_labels = 1 if datapiece["biased"] else 0
             else:
                 complete_labels = torch.cat([complete_inputs[:model_inputs.size(1)]*0-100, complete_inputs[model_inputs.size(1):]], dim=-1)

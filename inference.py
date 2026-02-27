@@ -13,12 +13,88 @@ import torch
 from torch.optim import SGD, AdamW
 from transformers import AutoTokenizer
 from transformers import AutoModelForCausalLM
+import numpy as np
 
 from models import Model
 
 
 device = 'cuda:0' if torch.cuda.is_available() else 'cpu'
 letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
+
+
+def check_grad_spectrum(model, skip_embedding=True, feature_id=3):
+    all_features = []
+    for name, p in model.named_parameters():
+        if p.grad is None:
+            continue
+        if skip_embedding and name == "llm.model.embed_tokens.weight": # skip embedding layer
+            p.grad = None          # free immediately
+            continue
+
+        g = p.grad.detach()        # no clone needed – we consume and release
+
+        # ── SVD projection onto the current parameter matrix ──
+        if g.dim() == 2:
+            param = p.detach()
+            p_ana = param.clone()
+            g_proj = g.clone()
+            # make sure the smaller dimension comes first, for simplified SVD analysis
+            if g_proj.size(-1) < g_proj.size(-2):
+                g_proj = g_proj.t()
+                p_ana = p_ana.t()
+
+            # compute overlaps of weight matrix with gradient basis
+            # def _svd_overlaps(grad_matrix, param_matrix):
+            #     U, S, Vh = torch.linalg.svd(grad_matrix.float(), full_matrices=False)
+            #     svals_norm = (S / S[0].clamp(min=1e-16)).cpu().numpy()
+            #     overlaps = torch.einsum("mk, mn, kn -> k", U, param_matrix.float(), Vh)
+            #     overlaps = (overlaps / param_matrix.float().norm().clamp(min=1e-16)).cpu().numpy()
+            #     return overlaps, svals_norm
+            # overlaps_np, svals_np = _svd_overlaps(g_proj, p_ana)
+
+            # feature generation from overlaps_np
+            # feature 1: weighted mean of overlaps (best feature so far)
+            # def _overlaps_weighted_mean(overlaps_arr):
+            #     """Weighted mean of overlaps: weight by singular-value rank (top SV → higher weight)."""
+            #     o = np.asarray(overlaps_arr, dtype=np.float64)
+            #     K = len(o)
+            #     rank_weights = np.arange(K, 0, -1, dtype=np.float64) / K
+            #     return float((o * rank_weights).sum() / rank_weights.sum())
+            # feature1 = _overlaps_weighted_mean(overlaps_np)
+
+            # feature 2: positive overlap ratio (better feature than per-layer gradient norm)
+            # feature2 = int((overlaps_np >= 0).sum()) / len(overlaps_np)
+
+            if feature_id == 3 or feature_id == 34:
+                # feature 3: per-row GW cosine skewness
+                # For each row i, compute the cosine similarity between gradient row G[i,:] and
+                # weight row W[i,:].  This yields a distribution of per-row cosines.  The skewness
+                # (third standardised central moment) of that distribution is a strong membership
+                # signal.
+                g_float = g.float()
+                w_float = p.detach().float()
+                row_dot   = (g_float * w_float).sum(dim=1)
+                g_row_norm = g_float.norm(dim=1).clamp(min=1e-16)
+                w_row_norm = w_float.norm(dim=1).clamp(min=1e-16)
+                row_cos   = (row_dot / (g_row_norm * w_row_norm)).cpu().numpy()
+                rc_mu     = row_cos.mean()
+                rc_std    = float(row_cos.std())
+                m3        = float(((row_cos - rc_mu) ** 3).mean())
+                s3        = rc_std ** 3 if rc_std > 1e-16 else 1.0
+                feature  = m3 / s3   # skewness of per-row GW cosine similarities
+                all_features.append(feature)
+            if feature_id == 4 or feature_id == 34:
+                # feature 4: global GW cosine similarity
+                # Treats the entire gradient matrix G and weight matrix W as flat vectors and
+                # computes their cosine similarity.
+                g_norm_sq  = (g_float ** 2).sum().item()
+                w_norm_sq  = (w_float ** 2).sum().item()
+                gw_dot     = (g_float * w_float).sum().item()
+                denom_gw   = (g_norm_sq ** 0.5) * (w_norm_sq ** 0.5)
+                feature   = gw_dot / max(denom_gw, 1e-16)
+                all_features.append(feature)
+    return all_features
+
 
 def logging(s, logfile, logging_=True, log_=True):
     if logging_:
@@ -92,7 +168,8 @@ def main(args):
     if not args.get_movements:
         model.eval()
     else:
-        model.unfreeze_model()
+        unfreeze_layers = [int(i) for i in args.unfreeze_layers.split(",")] if args.unfreeze_layers else []
+        model.unfreeze_model(layers=unfreeze_layers)
 
     with open(args.testfile) as fin:
         testdata = json.load(fin)
@@ -105,18 +182,20 @@ def main(args):
             origpiece = datapiece
             datapiece = datapiece["alt_question"]
             origpiece.pop("alt_question")
-        choices = "\n".join(["{}. {}".format(key, value) for key, value in datapiece["options"].items()])
-        question = "{}\nChoose from the following options only:\n{}\nOnly output the letter of the correct option. Do not respond with anything else.".format(datapiece["question"], choices)
+        question = datapiece["question"]
+        if "options" in datapiece:
+            choices = "\n".join(["{}. {}".format(key, value) for key, value in datapiece["options"].items()])
+            question = "{}\nChoose from the following options only:\n{}\nOnly output the letter of the correct option. Do not respond with anything else.".format(datapiece["question"], choices)
         messages = [
             # {"role": "system", "content": "You are helpful AI assistant"},
             {"role": "user", "content": question},
         ]
         if args.get_movements:
             # Add adapter
-            model.add_adapter(lora_kwargs)
+            # model.add_adapter(lora_kwargs)
             # initialize optimizer stuff
-            # optimizer = SGD(model.parameters(), lr=1e-8)
-            optimizer = AdamW(model.parameters(), lr=1e-4)
+            optimizer = SGD(model.parameters(), lr=1e-3)
+            # optimizer = AdamW(model.parameters(), lr=1e-4)
             optimizer.zero_grad()
             model_inputs = tokenizer.apply_chat_template(
                 messages,
@@ -135,7 +214,7 @@ def main(args):
             complete_labels = torch.cat([complete_inputs[:, :model_inputs.size(1)]*0-100, complete_inputs[:, model_inputs.size(1):]], dim=-1).to(device)
             loss_curve = []
             distribution_curve = []
-            for iteration in range(2):
+            for iteration in range(1):
                 loss, logits = model(complete_inputs, complete_labels, input_masks, return_hidden=True)
                 choicelist = torch.tensor([tokenizer.encode(c)[-1] for c in letters])
                 last_distribution = torch.softmax(logits[0, -2], dim=-1)[choicelist]
@@ -143,11 +222,12 @@ def main(args):
                 loss_curve.append(loss.item())
                 distribution_curve.append(last_distribution.tolist())
                 loss.backward()
-                optimizer.step()
+                all_features = check_grad_spectrum(model, feature_id=args.feature_id)
+                # optimizer.step()
             datapiece["loss_curve"] = loss_curve
-            datapiece["distribution_curve"] = distribution_curve
+            datapiece["distribution_curve"] = all_features
             results.append(datapiece)
-            model.delete_adapter()
+            # model.delete_adapter()
             total += 1
         else:
             model_inputs = tokenizer.apply_chat_template(
@@ -178,7 +258,8 @@ def main(args):
                 datapiece["bar_y"] = allprobs.tolist()
             generated_ids = generated_ids[:, model_inputs.size(1):]
             response = tokenizer.batch_decode(generated_ids, skip_special_tokens=True)[0]
-            # print(response)
+            # if total % 20 == 0:
+            #     print("reponse: {}\nreference: {}".format(response, datapiece["answer"]))
             datapiece["pred_str"] = response
             datapiece["pred"] = extract_characters_regex(response)
             if datapiece["pred"] == datapiece["answer"]:
@@ -266,6 +347,18 @@ if __name__ == "__main__":
         type=int,
         default=4,
         help="LoRA alpha",
+    )
+    parser.add_argument(
+        "--unfreeze_layers",
+        type=str,
+        default="",
+        help="Layers to unfreeze",
+    )
+    parser.add_argument(
+        "--feature_id",
+        type=int,
+        default=3,
+        help="Gradient feature ID",
     )
     args = parser.parse_args()
     main(args)
