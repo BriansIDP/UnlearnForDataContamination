@@ -265,10 +265,12 @@ def eval_one_epoch(
             input_ids, input_masks, complete_inputs, complete_labels, answer = batch
             if args.unlearnmode:
                 letter_ids = torch.tensor([tokenizer.encode(ans)[1] for ans in letters])
+                answer_ids = torch.tensor([letters.index(ans) for ans in answer]).to(input_ids.device)
                 pred = model.generate(input_ids, do_sample=False, return_dict=True, max_new_tokens=2)
                 bary = torch.softmax(pred["logits"][0], dim=-1)
                 bary = bary[torch.arange(bary.size(0)), letter_ids]
-                pred = torch.sqrt(((complete_labels - bary) ** 2).mean(dim=-1))
+                bar_y_c = bary[answer_ids]
+                pred = torch.sqrt(((complete_labels - bar_y_c) ** 2).mean(dim=-1))
                 total_loss += pred.mean()
             elif args.probetype != "":
                 loss, classoutput = model(input_ids, complete_labels)
@@ -437,6 +439,12 @@ if __name__ == "__main__":
         "--alpha",
         type=float,
         default=1.0,
+        help="alpha",
+    )
+    parser.add_argument(
+        "--threshold_yc",
+        type=float,
+        default=0.0,
         help="alpha",
     )
     args = parser.parse_args()

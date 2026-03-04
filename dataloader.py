@@ -74,20 +74,16 @@ class SupervisedDataset(Dataset):
             return_tensors="pt"
         )[0]
         if self.unlearnmode:
-            if "bar_y" in datapiece and "tildeyc" not in datapiece:
-                if self.validation:
-                    complete_labels = datapiece["bar_y"]
-                else:
-                    complete_labels = datapiece["bar_y"][self.letters.index(datapiece["answer"])]
+            if "variance" in datapiece:
+                bar_y_c = datapiece["bar_y"][self.letters.index(datapiece["answer"])]
+                alpha = 1 - datapiece["variance"] * 2
+                complete_labels = alpha * bar_y_c
+            elif "bar_y" in datapiece and "tildeyc" not in datapiece:
+                complete_labels = datapiece["bar_y"][self.letters.index(datapiece["answer"])]
             else:
                 complete_labels = datapiece["tildeyc"]
         else:
-            if "alpha" in self.probe:
-                complete_labels = datapiece["alpha"]
-            elif self.probe != "":
-                complete_labels = 1 if datapiece["biased"] else 0
-            else:
-                complete_labels = torch.cat([complete_inputs[:model_inputs.size(1)]*0-100, complete_inputs[model_inputs.size(1):]], dim=-1)
+            complete_labels = torch.cat([complete_inputs[:model_inputs.size(1)]*0-100, complete_inputs[model_inputs.size(1):]], dim=-1)
         return model_inputs, complete_inputs, complete_labels, datapiece["answer"]
 
 def collate_fn(batch):

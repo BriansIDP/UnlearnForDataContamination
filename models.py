@@ -34,6 +34,7 @@ class Model(torch.nn.Module):
         pool="average",
         losstype="kl",
         uselora=False,
+        threshold_yc=0.0,
     ):
         super(Model, self).__init__()
         self.llm = AutoModelForCausalLM.from_pretrained(
@@ -57,6 +58,7 @@ class Model(torch.nn.Module):
         self.losstype = losstype
         self.probemode = False
         self.probelayer = -1
+        self.threshold_yc = threshold_yc
 
     def initialize_probe(self, probetype="alpha"):
         self.probetype = probetype
@@ -147,16 +149,18 @@ class Model(torch.nn.Module):
                 unlearn_target = torch.where(choicelist.to(unlearn_target.device)[:, None] == unlearn_target)[0]
             y_bar_cs = probs[torch.arange(unlearn_target.size(0)), unlearn_target]
             y_bar_cs = torch.clip(y_bar_cs, min=0.0001, max=0.99)
-            if "bary" in self.losstype:
-                labels = y_bar_cs * alpha # factor to be changed
-            else:
-                labels = torch.clip(labels, min=0.0001, max=0.99)
-            target_dist = ((1 - labels) / (1 - y_bar_cs)).unsqueeze(1) * probs
-            target_dist[torch.arange(unlearn_target.size(0)), unlearn_target] = labels
+            per_sample_alpha = torch.clip(labels / y_bar_cs, min=0, max=1)
+            y_cs = y_bar_cs * per_sample_alpha
+            loss_mask = (per_sample_alpha < 1.0) * (y_bar_cs > self.threshold_yc)
+            target_dist = ((1 - y_cs) / (1 - y_bar_cs)).unsqueeze(1) * probs
+            target_dist[torch.arange(unlearn_target.size(0)), unlearn_target] = y_cs
             if "kl" in self.losstype:
-                loss = - (target_dist * logps).sum(dim=-1).mean()
-            elif "mse" in self.losstype:
-                loss = ((target_dist - torch.exp(logps)) ** 2).sum(dim=-1).mean()
+                loss = - (target_dist * logps).sum(dim=-1)
+                loss = (loss * loss_mask).mean()
+            elif "yc" in self.losstype:
+                bar_yc = torch.exp(logps[torch.arange(unlearn_target.size(0)), unlearn_target])
+                loss = ((y_cs - bar_yc) ** 2).sum(dim=-1)
+                loss = (loss * loss_mask).mean()
         else:
             if self.probemode:
                 if "mlp" in self.probetype:
