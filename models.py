@@ -114,12 +114,13 @@ class Model(torch.nn.Module):
         unlearn_target=None,
         alpha=1.0,
         return_hidden=False,
+        choice_mask=None,
     ):
         attention_mask = torch.ones_like(inputs)
         outputs = self.llm(
             input_ids=inputs,
             attention_mask=attention_mask,
-            output_hidden_states=True,
+            output_hidden_states=False,
             return_dict=True,
         )
         logits = outputs.logits[:, :-1]
@@ -144,8 +145,9 @@ class Model(torch.nn.Module):
             else:
                 probs = torch.exp(logps).detach().data
             if "norm" in self.losstype:
-                logps = torch.log_softmax(logps[:, choicelist], dim=-1)
-                probs = probs[:, choicelist] / probs[:, choicelist].sum(dim=-1, keepdim=True)
+                logps = torch.log_softmax(logps[:, choicelist].masked_fill(choice_mask.bool(), -1e9), dim=-1)
+                probs = probs[:, choicelist].masked_fill(choice_mask.bool(), 0.0)
+                probs = probs / probs.sum(dim=-1, keepdim=True)
                 unlearn_target = torch.where(choicelist.to(unlearn_target.device)[:, None] == unlearn_target)[0]
             y_bar_cs = probs[torch.arange(unlearn_target.size(0)), unlearn_target]
             y_bar_cs = torch.clip(y_bar_cs, min=0.0001, max=0.99)
@@ -162,22 +164,10 @@ class Model(torch.nn.Module):
                 loss = ((y_cs - bar_yc) ** 2).sum(dim=-1)
                 loss = (loss * loss_mask).mean()
         else:
-            if self.probemode:
-                if "mlp" in self.probetype:
-                    classoutput = self.linear_probe(outputs.hidden_states[self.probelayer].mean(dim=1))
-                else:
-                    classoutput = self.linear_probe(outputs.hidden_states[self.probelayer][:, -1])
-                if "alpha" in self.probetype:
-                    classoutput = torch.sigmoid(classoutput)
-                    loss = torch.sqrt((classoutput - labels) ** 2).mean()
-                else:
-                    loss = torch.nn.functional.cross_entropy(classoutput, labels)
-                loss = (loss, classoutput)
-            else:
-                labels = labels[:, 1:]
-                loss = torch.nn.functional.cross_entropy(logits.reshape(-1, logits.size(-1)), labels.reshape(-1))
-                if return_hidden:
-                    loss = (loss, logits)
+            labels = labels[:, 1:]
+            loss = torch.nn.functional.cross_entropy(logits.reshape(-1, logits.size(-1)), labels.reshape(-1))
+            if return_hidden:
+                loss = (loss, logits)
         return loss
 
     def generate(self, inputs, temperature=1.0, do_sample=True, max_new_tokens=512, return_dict=False):

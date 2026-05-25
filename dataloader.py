@@ -73,6 +73,7 @@ class SupervisedDataset(Dataset):
             add_generation_prompt=False,
             return_tensors="pt"
         )[0]
+        complete_inputs = complete_inputs[:4096]
         if self.unlearnmode:
             if "variance" in datapiece:
                 bar_y_c = datapiece["bar_y"][self.letters.index(datapiece["answer"])]
@@ -82,9 +83,11 @@ class SupervisedDataset(Dataset):
                 complete_labels = datapiece["bar_y"][self.letters.index(datapiece["answer"])]
             else:
                 complete_labels = datapiece["tildeyc"]
+            choice_mask = [0] * len(datapiece["options"]) + [1] * (10 - len(datapiece["options"]))
         else:
             complete_labels = torch.cat([complete_inputs[:model_inputs.size(1)]*0-100, complete_inputs[model_inputs.size(1):]], dim=-1)
-        return model_inputs, complete_inputs, complete_labels, datapiece["answer"]
+            choice_mask = [1] * 10
+        return model_inputs, complete_inputs, complete_labels, datapiece["answer"], choice_mask
 
 def collate_fn(batch):
     input_ids = pad_sequence([sample[0][0] for sample in batch], batch_first=True)
@@ -95,5 +98,6 @@ def collate_fn(batch):
     else:
         complete_labels = pad_sequence([sample[2] for sample in batch], batch_first=True, padding_value=-100)
     answer = [sample[3] for sample in batch]
+    choice_mask = torch.tensor([sample[4] for sample in batch])
     # bar_y_orig = [sample[4] for sample in batch] if batch[0][4] is not None else None
-    return input_ids, input_masks, complete_inputs, complete_labels, answer
+    return input_ids, input_masks, complete_inputs, complete_labels, answer, choice_mask

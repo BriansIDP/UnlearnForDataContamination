@@ -1,24 +1,25 @@
-export CUDA_VISIBLE_DEVICES=0
+export CUDA_VISIBLE_DEVICES=1
 
-expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_redosmall_unlearn_ensemble_oracle_yc_0.0
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev_order1
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_ytilde0.1_fixed_bary_norm
+# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_order1
+expdir=exp/qwen25_3B_instruct_contaminate_mathmcqa_with_indirect_eval_order1_unlearn_ensemble_0.5
+# expdir=exp/llama32_3B_instruct_contaminate_mathmcqa_with_indirect_eval_unlearn_ensemble_0.5
 # modelpath=meta-llama/Llama-3.2-3B-Instruct
 # modelpath=microsoft/Phi-3.5-mini-instruct
-ckpt=checkpoint.4.final
+ckpt=checkpoint.9.final
 # ckpt=checkpoint.0.20000
-testdata=data/train_target_true_eval.json
+testdata=data/MATH_MCQA/math_train_true_eval.json
+# testdata=data/train_target_true_dev_shuffle3.json
 # testdata=data/train_target_true_dev.json
-# testdata=data/mmlupro_alt_dev_tilde_1.json
 
 python inference.py \
     --model_path $expdir \
     --model_ckpt $ckpt \
     --testfile $testdata \
-    --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_trueeval.json \
+    --outfile $expdir/mathmcqa_target_results_with_bar_y_epoch5_trueeval.json \
     --nsamples 1 \
     --do_generation \
     --allchoices \
+    # --origmodel \
     # --get_movements \
     # --feature_id 4 \
     # --unfreeze_layers 24,25,26,27 \
@@ -27,48 +28,23 @@ python inference.py \
     # --allchoices \
     # --origmodel \
 
-# # ckpt=checkpoint.0.final
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev_order2
-# testdata=data/train_target_true_dev_alt.json
-# python inference.py \
-#     --model_path $expdir \
-#     --model_ckpt $ckpt \
-#     --testfile $testdata \
-#     --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_truedev_alt.json \
-#     --nsamples 1 \
-#     --do_generation \
-#     --allchoices \
+testdata=data/MATH_MCQA/math_train_true_dev.json
+expdir=exp/qwen25_3B_instruct_contaminate_mathmcqa_with_indirect_eval_order1_unlearn_ensemble_0.5
+python inference.py \
+    --model_path $expdir \
+    --model_ckpt $ckpt \
+    --testfile $testdata \
+    --outfile $expdir/mathmcqa_target_results_with_bar_y_epoch5_truedev.json \
+    --nsamples 1 \
+    --do_generation \
+    --allchoices \
 
-# # ckpt=checkpoint.1.20000
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev_order3
-# testdata=data/train_target_true_dev_alt_shuffle.json
+# expdir=exp/qwen25_3B_instruct_contaminate_mathmcqa_with_indirect_dev_order5
 # python inference.py \
 #     --model_path $expdir \
 #     --model_ckpt $ckpt \
 #     --testfile $testdata \
-#     --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_truedev_alt_permute.json \
-#     --nsamples 1 \
-#     --do_generation \
-#     --allchoices \
-
-# # ckpt=checkpoint.1.40000
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev_order4
-# python inference.py \
-#     --model_path $expdir \
-#     --model_ckpt $ckpt \
-#     --testfile $testdata \
-#     --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_trueeval_permute.json \
-#     --nsamples 1 \
-#     --do_generation \
-#     --allchoices \
-
-# # ckpt=checkpoint.1.final
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev_order5
-# python inference.py \
-#     --model_path $expdir \
-#     --model_ckpt $ckpt \
-#     --testfile $testdata \
-#     --outfile $expdir/mmlupro_target_results_with_bar_y_epoch5_trueeval_permute.json \
+#     --outfile $expdir/mathmcqa_target_results_with_bar_y_epoch5_trueeval.json \
 #     --nsamples 1 \
 #     --do_generation \
 #     --allchoices \

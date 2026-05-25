@@ -162,12 +162,27 @@ def main(rank, args, world_size):
         lr_scheduler = accelerate.utils.DummyScheduler(
             optimizer, total_num_steps=max_train_steps, warmup_num_steps=num_warmup_steps
         )
+    
+    if lora_kwargs["uselora"]:
+        for v, parameter in model.llm.named_parameters():
+            if "lora" not in v:
+                parameter.requires_grad = False
+    else:
+        for v, parameter in model.llm.named_parameters():
+            parameter.requires_grad = True
+
     model, optimizer, train_dataloader, lr_scheduler, val_dataloader = accelerator.prepare(
         model, optimizer, train_dataloader, lr_scheduler, val_dataloader)
 
     for v, parameter in model.llm.named_parameters():
         if "lora" not in v:
             parameter.requires_grad = False
+
+    if accelerator.is_main_process:
+        for v, parameter in model.named_parameters():
+            if parameter.requires_grad:
+                print(v)
+        print("Start training")
 
     print("Start training")
     best_val_loss = 10000
@@ -218,10 +233,13 @@ def train_one_epoch(
     trainsize = len(train_dataloader)
     start = time.time()
     for i, batch in enumerate(train_dataloader):
-        input_ids, input_masks, complete_inputs, complete_labels, answer = batch
+        input_ids, input_masks, complete_inputs, complete_labels, answer, choice_mask = batch
         if args.unlearnmode:
-            answer_ids = torch.tensor([tokenizer.encode(ans)[1] for ans in answer]).to(input_ids.device)
-            loss = model(complete_inputs, complete_labels, input_masks, unlearn_target=answer_ids, alpha=args.alpha)
+            if "Qwen" in args.model_path:
+                answer_ids = torch.tensor([tokenizer.encode(ans)[0] for ans in answer]).to(input_ids.device)
+            else:
+                answer_ids = torch.tensor([tokenizer.encode(ans)[1] for ans in answer]).to(input_ids.device)
+            loss = model(complete_inputs, complete_labels, input_masks, unlearn_target=answer_ids, alpha=args.alpha, choice_mask=choice_mask)
         elif args.probetype != "":
             loss, classpred = model(input_ids, complete_labels, input_masks)
         else:
@@ -238,9 +256,9 @@ def train_one_epoch(
             elasped_time = time.time() - start
             logging(f"Epoch {epoch} | Batch {i}/{trainsize} | Loss: {loss:.3f} | time {elasped_time}", args.logfile)
 
-        if (i + 1) % args.save_interval == 0 and accelerator.is_main_process:
-            logging(f"Saving at Step {i+1}", args.logfile)
-            save_checkpoint(model, tokenizer, args.outputdir, epoch, i+1)
+        # if (i + 1) % args.save_interval == 0 and accelerator.is_main_process:
+        #     logging(f"Saving at Step {i+1}", args.logfile)
+        #     save_checkpoint(model, tokenizer, args.outputdir, epoch, i+1)
 
     return model
 
@@ -262,13 +280,15 @@ def eval_one_epoch(
     with torch.no_grad():
         logging("="*89, args.logfile)
         for i, batch in tqdm(enumerate(val_dataloader)):
-            input_ids, input_masks, complete_inputs, complete_labels, answer = batch
+            input_ids, input_masks, complete_inputs, complete_labels, answer, choice_mask = batch
             if args.unlearnmode:
-                letter_ids = torch.tensor([tokenizer.encode(ans)[1] for ans in letters])
+                if "Qwen" in args.model_path:
+                    letter_ids = torch.tensor([tokenizer.encode(ans)[0] for ans in letters])
+                else:
+                    letter_ids = torch.tensor([tokenizer.encode(ans)[1] for ans in letters])
                 answer_ids = torch.tensor([letters.index(ans) for ans in answer]).to(input_ids.device)
                 pred = model.generate(input_ids, do_sample=False, return_dict=True, max_new_tokens=2)
-                bary = torch.softmax(pred["logits"][0], dim=-1)
-                bary = bary[torch.arange(bary.size(0)), letter_ids]
+                bary = torch.softmax(pred["logits"][0][0][letter_ids].masked_fill(choice_mask[0].bool(), -1e9), dim=-1)
                 bar_y_c = bary[answer_ids]
                 pred = torch.sqrt(((complete_labels - bar_y_c) ** 2).mean(dim=-1))
                 total_loss += pred.mean()

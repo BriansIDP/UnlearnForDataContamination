@@ -152,6 +152,7 @@ def main(args):
             lora_kwargs = json.load(fin)
     if os.path.exists(os.path.join(args.model_path, "base_model")):
         model_path = os.path.join(args.model_path, "base_model")
+        print("Base mode path:", model_path)
     model = Model(
         model_path,
         tokenizer,
@@ -162,7 +163,8 @@ def main(args):
         modelpath = os.path.join(args.model_path, args.model_ckpt, "pytorch_model.pt")
         trained_params = torch.load(modelpath)
         msg = model.load_state_dict(trained_params, strict=False)
-        model.merge_and_reload("basemodel", None, save=False, load_new=False)
+        if lora_kwargs["uselora"]:
+            model.merge_and_reload("basemodel", None, save=False, load_new=False)
         # print(msg)
     model = model.to(device)
     if not args.get_movements:
@@ -240,7 +242,7 @@ def main(args):
             with torch.no_grad():
                 generated_ids = model.generate(
                     model_inputs,
-                    max_new_tokens=32,
+                    max_new_tokens=2,
                     do_sample=args.do_sample,
                     return_dict=args.outputlogp or args.allchoices,
                 )
