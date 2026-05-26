@@ -7,8 +7,8 @@ import numpy as np
 # origfile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
 # infile = "exp/llama32_3B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_epoch3.json" # sys.argv[2]
 # origfile = "exp/llama32_3B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_orig.json"
-# infile = "exp/qwen25_3B_instruct_contaminate_mmlupro_with_indirect_eval_order1/mmlupro_target_results_with_bar_y_epoch5_truedev.json"
-infile = "exp/llama32_3B_instruct_contaminate_mathmcqa_with_indirect_eval_redosm_deconIEP/mmlupro_target_results_with_bar_y_epoch5_truedev.json"
+infile = "exp/qwen25_3B_instruct_contaminate_mmlupro_with_indirect_eval_order1/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
+# infile = "exp/llama32_3B_instruct_contaminate_mathmcqa_with_indirect_eval_redosm_deconIEP/mmlupro_target_results_with_bar_y_epoch5_truedev.json"
 # infile = "exp/qwen25_3B_instruct_contaminate_mmlupro_with_indirect_eval_order1_unlearn_ensemble_0.9/mmlupro_target_results_with_bar_y_epoch5_true.json"
 # tildefile = "exp/llama32_3B_instruct_contaminate_mmlupro_unlearn_devtilde_ytilde/mmlupro_target_results_with_bar_y_epoch5_devtilde_orig.json"
 # tildefile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev/mmlupro_target_results_with_bar_y_epoch5_trueeval.json"
@@ -20,12 +20,12 @@ infile = "exp/llama32_3B_instruct_contaminate_mathmcqa_with_indirect_eval_redosm
 normalize = True
 use_tilde = False
 use_pred_alpha = False
-bar_yc_threshold = 0.8
+bar_yc_threshold = 0.5
 shuffled = True
 letters = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J"]
 
 qid_to_alpha = {}
-with open("results/correlation_batchorder_dev_crossdata.json") as fin:
+with open("results/correlation_batchorder_eval.json") as fin:
     alphadata = json.load(fin)
 for qid, datapiece in alphadata.items():
     qid_to_alpha[int(qid)] = 1 - 2 * np.std(datapiece["bar_y_c"])
@@ -35,9 +35,11 @@ question_to_choice = {}
 for k in range(1):
     # origfile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev_order{}/mmlupro_target_results_with_bar_y_epoch5_truedev.json".format(k+1)
     # origfile = "exp/qwen25_3B_instruct_contaminate_mmlupro_with_indirect_eval_order1/mmlupro_target_results_with_bar_y_epoch5_truedev.json"
-    origfile = "exp/llama32_3B_instruct_contaminate_mathmcqa_with_indirect_eval_order1/mmlupro_target_results_with_bar_y_epoch5_truedev.json"
-    # origfile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev/mmlupro_target_results_with_bar_y_epoch5_trueeval_ensemble.json"
-    # origfile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_redosmall/mmlupro_target_results_with_bar_y_epoch5_truedev.json"
+    # origfile = "exp/llama32_3B_instruct_contaminate_mathmcqa_with_indirect_eval_order1/mmlupro_target_results_with_bar_y_epoch5_truedev.json"
+   
+    # The following is the decontamination target file (which is the average across uncontaminated ensembles)
+    origfile = "exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_dev/mmlupro_target_results_with_bar_y_epoch5_trueeval_ensemble.json"
+
     with open(origfile) as fin:
         data = json.load(fin)
     for datapiece in data:

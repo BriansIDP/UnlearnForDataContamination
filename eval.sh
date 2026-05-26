@@ -1,11 +1,11 @@
 export CUDA_VISIBLE_DEVICES=1
 
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_order1
-expdir=exp/qwen25_3B_instruct_contaminate_mathmcqa_with_indirect_eval_order1_unlearn_ensemble_0.5
+expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_order1
+# expdir=exp/qwen25_3B_instruct_contaminate_mathmcqa_with_indirect_eval_order1_unlearn_ensemble_0.5
 # expdir=exp/llama32_3B_instruct_contaminate_mathmcqa_with_indirect_eval_unlearn_ensemble_0.5
 # modelpath=meta-llama/Llama-3.2-3B-Instruct
 # modelpath=microsoft/Phi-3.5-mini-instruct
-ckpt=checkpoint.9.final
+ckpt=checkpoint.4.final
 # ckpt=checkpoint.0.20000
 testdata=data/MATH_MCQA/math_train_true_eval.json
 # testdata=data/train_target_true_dev_shuffle3.json

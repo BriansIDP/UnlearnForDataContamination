@@ -5,24 +5,14 @@ pip install numpy==1.26.4
 
 probetype="mlp"
 threshold_yc=0.5
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_eval_probe_${probetype}
-# expdir=exp/llama32_3B_instruct_contaminate_mathmcqa_with_indirect_eval_redosm_deconIEP
-# expdir=exp/qwen25_3B_instruct_contaminate_mmlupro_with_indirect_eval_order1_deconIEP
-expdir=exp/qwen25_3B_instruct_contaminate_mathmcqa_with_indirect_eval_order1_unlearn_ensemble_${threshold_yc}
-# expdir=exp/llama32_3B_instruct_contaminate_mathmcqa_with_indirect_eval_unlearn_ensemble_${threshold_yc}
-# expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_ytilde0.9_fixed_bary_norm
-modelname=Qwen/Qwen2.5-3B-Instruct
-# modelname=meta-llama/Llama-3.2-3B-Instruct
-# modelname=meta-llama/Llama-3.1-8B-Instruct
+# expdir=exp/qwen25_3B_instruct_contaminate_mathmcqa_with_indirect_eval_order1_unlearn_ensemble_${threshold_yc}
+expdir=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_unlearn_ensemble_${threshold_yc}
+
+# modelname=Qwen/Qwen2.5-3B-Instruct
+modelname=meta-llama/Llama-3.2-3B-Instruct
+
 mkdir -p $expdir
-# traindata=data/train_target_indirect_unbiased_order1.json
-# traindata=data/train_target_indirect_biased_open.json
-# traindata=data/train_target_indirect_biased_order1.json
-# traindata=data/MATH_MCQA/math_train_indirect_biased_order1.json
-# validdata=data/train_target_true_eval.json
-# validdata=data/MATH_MCQA/math_train_true_eval.json
-# validdata=data/train_target_mark.json
-# validdata=data/train_target_mark_indirect_alpha.json
+
 # traindata=exp/llama32_3B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_orig.json
 # traindata=exp/llama32_3B_instruct_contaminate_mmlupro_indirect/mmlupro_target_results_with_tilde_y_epoch1.json
 # validdata=exp/llama32_3B_instruct_contaminate_mmlupro_indirect/mmlupro_target_results_with_bar_y_epoch1_orig.json
@@ -30,10 +20,10 @@ mkdir -p $expdir
 # traindata=exp/llama32_3B_instruct_contaminate_mmlupro_with_indirect_eval_redosmall/mmlupro_target_results_with_bar_y_epoch5_truedeveval_origmodel.json
 # traindata=exp/llama32_3B_instruct_contaminate_mathmcqa_with_indirect_eval_order1/mathmcqa_target_results_with_bar_y_epoch5_truedeveval_origmodel.json
 # traindata=exp/qwen25_3B_instruct_contaminate_mmlupro_with_indirect_eval_order1/mmlupro_target_results_with_bar_y_epoch5_truedeveval_origmodel.json
-traindata=results/ensemble_biased_model_math_qwen_truedeveval.json
-# validdata=exp/llama32_3B_instruct_contaminate_mmlupro/mmlupro_target_results_with_bar_y_orig.json
-validdata=exp/qwen25_3B_instruct_contaminate_mathmcqa_with_indirect_dev_order1/mathmcqa_target_results_with_bar_y_epoch5_trueeval_ensemble.json
-# validdata=exp/qwen25_3B_instruct_contaminate_mmlupro_with_indirect_dev_order1/mmlupro_target_results_with_bar_y_epoch5_trueeval_ensemble.json
+traindata=results/ensemble_biased_model_truedeveval.json
+
+# validdata=exp/qwen25_3B_instruct_contaminate_mathmcqa_with_indirect_dev_order1/mathmcqa_target_results_with_bar_y_epoch5_trueeval_ensemble.json
+validdata=exp/qwen25_3B_instruct_contaminate_mmlupro_with_indirect_dev_order1/mmlupro_target_results_with_bar_y_epoch5_trueeval_ensemble.json
 # load_from=exp/llama32_3B_instruct_contaminate_mmlupro_eval/checkpoint.2.final
 load_from=exp/qwen25_3B_instruct_contaminate_mathmcqa_with_indirect_eval_order1/checkpoint.4.final
 
